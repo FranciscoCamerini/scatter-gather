@@ -1,7 +1,7 @@
 .PHONY: all
 
-target = master
-srcs = master.go
+target = orchestrator
+srcs = orchestrator.go
 
 all: $(target)
 

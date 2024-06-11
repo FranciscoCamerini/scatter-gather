@@ -1,18 +1,18 @@
 CPUS ?= $(shell nproc)
 MAKEFLAGS += --jobs=$(CPUS)
-.PHONY: stop clean all crawler master
+.PHONY: stop clean all worker orchestrator
 
-all: master crawler
+all: orchestrator worker
 
 clean:
-	$(MAKE) -C crawler clean
-	$(MAKE) -C master clean
+	$(MAKE) -C worker clean
+	$(MAKE) -C orchestrator clean
 
 stop:
 	for f in `ls storage/.*.pid`; do read c < $$f; kill -- $$c; rm $$f; done
 
-crawler:
-	$(MAKE) -C crawler
+worker:
+	$(MAKE) -C worker
 
-master:
-	$(MAKE) -C master
+orchestrator:
+	$(MAKE) -C orchestrator

@@ -1,7 +1,7 @@
 .PHONY: all
 
-target = crawler
-srcs = crawler.go
+target = worker
+srcs = worker.go
 
 all: $(target)
 

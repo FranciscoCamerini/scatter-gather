@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	crawler server.Server
+	worker server.Server
 )
 
 func handleConnection(conn net.Conn) {
@@ -23,11 +23,11 @@ func handleConnection(conn net.Conn) {
 	msg = strings.TrimSuffix(msg, "\n")
 
 	if err != nil {
-		crawler.Log(err.Error())
+		worker.Log(err.Error())
 		return
 	}
 
-	crawler.Log("received message: \"%s\"", msg)
+	worker.Log("received message: \"%s\"", msg)
 	response := parseFiles(strings.Split(msg, ","))
 	if response == "" {
 		return
@@ -38,7 +38,7 @@ func handleConnection(conn net.Conn) {
 func parseFiles(words []string) string {
 	entries, err := os.ReadDir("./public")
 	if err != nil {
-		crawler.Log(err.Error())
+		worker.Log(err.Error())
 		return ""
 	}
 
@@ -50,7 +50,7 @@ func parseFiles(words []string) string {
 	for _, e := range entries {
 		file, err := os.Open(fmt.Sprintf("./public/%s", e.Name()))
 		if err != nil {
-			crawler.Log("Error opening file: %s", err.Error())
+			worker.Log("Error opening file: %s", err.Error())
 			continue
 		}
 
@@ -68,7 +68,7 @@ func parseFiles(words []string) string {
 
 	json, err := json.Marshal(wordMap)
 	if err != nil {
-		crawler.Log("Error converting to JSON: %s", err.Error())
+		worker.Log("Error converting to JSON: %s", err.Error())
 		return ""
 	}
 
@@ -85,11 +85,11 @@ func main() {
 	flag.StringVar(&pidFile, "pidfile", "", "Sets the pidfile to write to")
 	flag.Parse()
 
-	crawler = server.Server{
+	worker = server.Server{
 		Port:     port,
 		PIDFile:  pidFile,
-		Name:     fmt.Sprintf("crawler-%d", port),
+		Name:     fmt.Sprintf("worker-%d", port),
 		LogColor: "\u001B[34m",
 	}
-	crawler.Run(handleConnection)
+	worker.Run(handleConnection)
 }
