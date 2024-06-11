@@ -24,15 +24,15 @@ func handleConnection(conn net.Conn) {
 	for {
 		b, _, err := reader.ReadLine()
 		if err != nil {
-			orchestrator.Log(err.Error())
+			orchestrator.Log("error reading from connection: %s", err.Error())
 			return
 		}
 
-		msg := string(b)
-		orchestrator.Log("received message: \"%s\"", msg)
+		message := string(b)
+		orchestrator.Log("received message: \"%s\"", message)
 
-		responseChannel := make(chan map[string]map[string]int, len(workerPorts))
-		words := strings.Split(msg, " ")
+		responseChannel := make(chan []byte, len(workerPorts))
+		words := strings.Split(message, " ")
 		scatterMessage(words, responseChannel)
 
 		responseCount := 0
@@ -40,7 +40,14 @@ func handleConnection(conn net.Conn) {
 		for response := range responseChannel {
 			responseCount++
 
-			for word, appearances := range response {
+			var responseData map[string]map[string]int
+			err = json.Unmarshal([]byte(response), &responseData)
+			if err != nil {
+				orchestrator.Log("error parsing JSON: %s", err.Error())
+				break
+			}
+
+			for word, appearances := range responseData {
 				if len(appearances) > 0 {
 					conn.Write([]byte(fmt.Sprintf("\u001B[32m%s:\u001B[0m\n", word)))
 					for file, count := range appearances {
@@ -59,7 +66,7 @@ func handleConnection(conn net.Conn) {
 	}
 }
 
-func scatterMessage(words []string, responseChannel chan<- map[string]map[string]int) {
+func scatterMessage(words []string, responseChannel chan<- []byte) {
 	wordsPerWorker := len(words) / len(workerPorts)
 	if wordsPerWorker == 0 {
 		wordsPerWorker = 1
@@ -85,35 +92,33 @@ func scatterMessage(words []string, responseChannel chan<- map[string]map[string
 	}
 }
 
-func dialWorker(port int, words string, responseChannel chan<- map[string]map[string]int) {
+func dialWorker(port int, words string, responseChannel chan<- []byte) {
 	orchestrator.Log("sending \"%s\" to %d", words, port)
 
 	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
-		orchestrator.Log(err.Error())
+		orchestrator.Log("error dialing worker: %s", err.Error())
+		responseChannel <- nil
 		return
 	}
+	defer conn.Close()
 
 	_, err = conn.Write([]byte(fmt.Sprintf("%s\n", words)))
 	if err != nil {
-		orchestrator.Log(err.Error())
+		orchestrator.Log("error writing to worker: %s", err.Error())
+		responseChannel <- nil
 		return
 	}
 
 	reader := bufio.NewReader(conn)
-	msg, _ := reader.ReadString('\n')
-	response := strings.TrimSuffix(msg, "\n")
-
-	orchestrator.Log("response from %d: \"%s\"", port, response)
-
-	var data map[string]map[string]int
-	err = json.Unmarshal([]byte(response), &data)
+	response, _, err := reader.ReadLine()
 	if err != nil {
-		orchestrator.Log("Error parsing JSON: %s", err.Error())
-		return
+		orchestrator.Log("error reading response: %s", err.Error())
+		responseChannel <- nil
+	} else {
+		orchestrator.Log("response from %d: \"%s\"", port, string(response))
+		responseChannel <- response
 	}
-
-	responseChannel <- data
 }
 
 func main() {

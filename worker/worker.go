@@ -19,16 +19,17 @@ func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
-	msg, err := reader.ReadString('\n')
-	msg = strings.TrimSuffix(msg, "\n")
-
+	message, err := reader.ReadString('\n')
 	if err != nil {
-		worker.Log(err.Error())
+		worker.Log("error reading from connection: %s", err.Error())
 		return
 	}
+	message = strings.TrimSuffix(message, "\n")
 
-	worker.Log("received message: \"%s\"", msg)
-	response := parseFiles(strings.Split(msg, ","))
+	worker.Log("received message: \"%s\"", message)
+
+	words := strings.Split(message, ",")
+	response := parseFiles(words)
 	if response == "" {
 		return
 	}
@@ -38,7 +39,7 @@ func handleConnection(conn net.Conn) {
 func parseFiles(words []string) string {
 	entries, err := os.ReadDir("./public")
 	if err != nil {
-		worker.Log(err.Error())
+		worker.Log("error reading from public dir: %s", err.Error())
 		return ""
 	}
 
@@ -50,7 +51,7 @@ func parseFiles(words []string) string {
 	for _, e := range entries {
 		file, err := os.Open(fmt.Sprintf("./public/%s", e.Name()))
 		if err != nil {
-			worker.Log("Error opening file: %s", err.Error())
+			worker.Log("error opening file: %s", err.Error())
 			continue
 		}
 
@@ -68,7 +69,7 @@ func parseFiles(words []string) string {
 
 	json, err := json.Marshal(wordMap)
 	if err != nil {
-		worker.Log("Error converting to JSON: %s", err.Error())
+		worker.Log("error converting to JSON: %s", err.Error())
 		return ""
 	}
 
