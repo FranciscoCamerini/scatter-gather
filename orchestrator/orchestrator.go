@@ -6,8 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"net"
-	"os"
-	"strconv"
 	"strings"
 
 	"scattergather/server"
@@ -15,7 +13,7 @@ import (
 
 var (
 	orchestrator server.Server
-	workerPorts  []int
+	workerPorts  []string
 )
 
 func handleConnection(conn net.Conn) {
@@ -45,18 +43,17 @@ func handleConnection(conn net.Conn) {
 			err = json.Unmarshal([]byte(response), &responseData)
 			if err != nil {
 				orchestrator.Log("error parsing JSON: %s", err.Error())
-				break
-			}
-
-			for word, appearances := range responseData {
-				if len(appearances) > 0 {
-					conn.Write([]byte(fmt.Sprintf("\u001B[32m%s:\u001B[0m\n", word)))
-					for file, count := range appearances {
-						conn.Write([]byte(fmt.Sprintf("- File: %s. Count: %d\n\n", file, count)))
+			} else {
+				for word, appearances := range responseData {
+					if len(appearances) > 0 {
+						conn.Write([]byte(fmt.Sprintf("\u001B[32m%s:\u001B[0m\n", word)))
+						for file, count := range appearances {
+							conn.Write([]byte(fmt.Sprintf("- File: %s. Count: %d\n\n", file, count)))
+						}
+					} else {
+						conn.Write([]byte(fmt.Sprintf("\u001B[31m%s:\u001B[0m\n", word)))
+						conn.Write([]byte("- Not found.\n\n"))
 					}
-				} else {
-					conn.Write([]byte(fmt.Sprintf("\u001B[31m%s:\u001B[0m\n", word)))
-					conn.Write([]byte("- Not found.\n\n"))
 				}
 			}
 
@@ -89,14 +86,15 @@ func scatterMessage(words []string, responseChannel chan<- []byte) {
 		}
 		wordsProcessed += wordsPerWorker
 
-		go dialWorker(workerPorts[i], strings.Join(words[startIdx:endIdx][:], ","), responseChannel)
+		wordsToProcess := strings.Join(words[startIdx:endIdx][:], ",")
+		go dialWorker(workerPorts[i], wordsToProcess, responseChannel)
 	}
 }
 
-func dialWorker(port int, words string, responseChannel chan<- []byte) {
-	orchestrator.Log("sending \"%s\" to %d", words, port)
+func dialWorker(port string, words string, responseChannel chan<- []byte) {
+	orchestrator.Log("sending \"%s\" to %s", words, port)
 
-	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", port))
+	conn, err := net.Dial("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
 		orchestrator.Log("error dialing worker: %s", err.Error())
 		responseChannel <- nil
@@ -117,7 +115,7 @@ func dialWorker(port int, words string, responseChannel chan<- []byte) {
 		orchestrator.Log("error reading response: %s", err.Error())
 		responseChannel <- nil
 	} else {
-		orchestrator.Log("response from %d: \"%s\"", port, string(response))
+		orchestrator.Log("response from %s: \"%s\"", port, string(response))
 		responseChannel <- response
 	}
 }
@@ -130,19 +128,11 @@ func main() {
 	)
 
 	flag.IntVar(&port, "port", 8080, "Sets the port number to listen to")
-	flag.StringVar(&workers, "workers", "8081,8081", "Sets ports to be used to spawn workers. E.g.: 8081,8082")
+	flag.StringVar(&workers, "workers", "8081,8081", "Which ports the workers are running on. E.g.: 8081,8082")
 	flag.StringVar(&pidFile, "pidfile", "", "Sets the pidfile to write to")
 	flag.Parse()
 
-	for _, portString := range strings.Split(workers, ",") {
-		port, err := strconv.Atoi(portString)
-		if err != nil {
-			orchestrator.Log("%s: %s", err.Error(), portString)
-			os.Exit(1)
-		}
-
-		workerPorts = append(workerPorts, port)
-	}
+	workerPorts = strings.Split(workers, ",")
 
 	orchestrator = server.Server{
 		Port:     port,
