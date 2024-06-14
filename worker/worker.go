@@ -13,7 +13,8 @@ import (
 )
 
 var (
-	worker server.Server
+	worker    server.Server
+	publicDir string
 )
 
 func handleConnection(conn net.Conn) {
@@ -31,17 +32,17 @@ func handleConnection(conn net.Conn) {
 
 	words := strings.Split(message, ",")
 	response := parseFiles(words)
-	if response == "" {
+	if response == nil {
 		return
 	}
-	conn.Write([]byte(fmt.Sprintf("%s\n", response)))
+	conn.Write(append(response, '\n'))
 }
 
-func parseFiles(words []string) string {
-	entries, err := os.ReadDir("./public")
+func parseFiles(words []string) []byte {
+	entries, err := os.ReadDir(publicDir)
 	if err != nil {
 		worker.Log("error reading from public dir: %s", err.Error())
-		return ""
+		return nil
 	}
 
 	wordMap := make(map[string]map[string]int)
@@ -71,10 +72,10 @@ func parseFiles(words []string) string {
 	json, err := json.Marshal(wordMap)
 	if err != nil {
 		worker.Log("error converting to JSON: %s", err.Error())
-		return ""
+		return nil
 	}
 
-	return string(json)
+	return json
 }
 
 func main() {
@@ -85,6 +86,7 @@ func main() {
 
 	flag.IntVar(&port, "port", 8081, "Sets the port number to listen to")
 	flag.StringVar(&pidFile, "pidfile", "", "Sets the pidfile to write to")
+	flag.StringVar(&publicDir, "publicdir", "", "Public directory path")
 	flag.Parse()
 
 	worker = server.Server{
