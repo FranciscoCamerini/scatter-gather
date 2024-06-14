@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"server/server"
 	"strconv"
 	"strings"
+
+	"scattergather/server"
 )
 
 var (

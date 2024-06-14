@@ -29,7 +29,7 @@ To connect and query the orchestrator, assuming it is running on port 8080, you 
 telnet localhost 8080
 ```
 
-To kill all processes, in the root of the project run.
+To kill all running processes, in the root of the project run.
 ```bash
 make stop
 ```

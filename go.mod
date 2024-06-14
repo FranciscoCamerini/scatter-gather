@@ -1,4 +1,4 @@
-module server/server
+module scattergather
 
 go 1.19
 

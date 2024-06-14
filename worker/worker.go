@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"server/server"
 	"strings"
+
+	"scattergather/server"
 )
 
 var (
